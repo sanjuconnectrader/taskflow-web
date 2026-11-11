@@ -13,7 +13,7 @@ jobs:
   validate:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
@@ -47,7 +47,7 @@ jobs:
         run: |
           rules=$(gh api "repos/$GITHUB_REPOSITORY/environments/production" --jq '[.protection_rules[] | select(.type == "required_reviewers")] | length')
           test "$rules" -gt 0 || { echo "Configure required reviewers on the production environment before production releases."; exit 1; }
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
