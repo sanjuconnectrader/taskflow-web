@@ -5,7 +5,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { ArrowRight, CheckCircle2 } from "lucide-react";
 import { Logo, ErrorNotice } from "./ui";
-import { send, API, configureAPI } from "@/lib/api";
+import { send } from "@/lib/api";
 import { isNative, saveSession } from "@/lib/platform";
 const schema = z.object({
   email: z.email("Enter a valid email address."),
@@ -23,7 +23,6 @@ export function AuthScreen({ onLogin }: { onLogin: () => void }) {
   );
   const [error, setError] = useState<unknown>();
   const [message, setMessage] = useState("");
-  const [endpoint, setEndpoint] = useState(API);
   const {
     register,
     handleSubmit,
@@ -272,38 +271,6 @@ export function AuthScreen({ onLogin }: { onLogin: () => void }) {
               </button>
             )}
           </div>
-          <details className="legal connection-settings">
-            <summary>API connection settings</summary>
-            <p>
-              Connect to your TaskFlow operator’s API. Your sign-in details will
-              be sent to this address. Use the same API in web, desktop and
-              mobile.
-            </p>
-            <form
-              onSubmit={async (e) => {
-                e.preventDefault();
-                try {
-                  await configureAPI(endpoint);
-                } catch (error) {
-                  setError(error);
-                }
-              }}
-            >
-              <label>
-                API origin
-                <input
-                  type="url"
-                  value={endpoint}
-                  onChange={(e) => setEndpoint(e.target.value)}
-                  required
-                  placeholder="https://api.example.com"
-                />
-              </label>
-              <button className="secondary" type="submit">
-                Save connection & reload
-              </button>
-            </form>
-          </details>
           <details className="legal">
             <summary>Terms & Privacy Policy</summary>
             <p>

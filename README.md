@@ -48,4 +48,4 @@ Browser sessions use HttpOnly cookies. Desktop and Android adapters persist opaq
 
 See [DEPLOYMENT.md](DEPLOYMENT.md) for Vercel setup, domain/cookie configuration, GitHub secrets, tag releases and deployment approvals.
 
-The sign-in screen's **API connection settings** can override the public build-time API address with an operator-provided HTTPS origin. Native credentials are cleared before changing origins. Choose the same backend on every client.
+API connection controls are intentionally absent from the product UI. Developers configure `NEXT_PUBLIC_API_URL` before building the shared frontend for all clients.
