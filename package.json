@@ -11,7 +11,7 @@
     "preview": "node scripts/preview.mjs"
   },
   "engines": {
-    "node": ">=22.14"
+    "node": "22.x"
   },
   "dependencies": {
     "@capacitor/app": "^8.0.0",

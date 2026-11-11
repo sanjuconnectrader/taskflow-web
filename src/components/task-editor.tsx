@@ -22,7 +22,7 @@ export function TaskEditor({
   members: Member[];
   wid: string;
   onClose: () => void;
-  onSaved: () => void;
+  onSaved: (task?: Task, action?: "created" | "updated" | "deleted") => void;
   readOnly?: boolean;
   initialDate?: string;
   restricted?: boolean;
@@ -56,7 +56,7 @@ export function TaskEditor({
     setBusy(true);
     setError(null);
     try {
-      await send(
+      const saved = await send(
         task ? `${base}/tasks/${task.id}` : `${base}/tasks`,
         restricted && task ? {status,checklist,version:task.version} : {
           title,
@@ -77,7 +77,7 @@ export function TaskEditor({
         },
         task ? "PATCH" : "POST",
       );
-      onSaved();
+      onSaved(saved, task ? "updated" : "created");
       onClose();
     } catch (e) {
       setError(e);
@@ -89,12 +89,12 @@ export function TaskEditor({
     if (!task) return;
     setBusy(true);
     try {
-      await send(
+      const saved = await send(
         `${base}/tasks/${task.id}`,
         remove ? undefined : { ...data, version: task.version },
         remove ? "DELETE" : "PATCH",
       );
-      onSaved();
+      onSaved(remove ? task : saved, remove ? "deleted" : "updated");
       onClose();
     } catch (e) {
       setError(e);

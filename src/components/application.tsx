@@ -856,7 +856,18 @@ function WorkspaceApp({
           members={members.data || []}
           wid={wid}
           onClose={() => setEditor(undefined)}
-          onSaved={refresh}
+          onSaved={(saved, action) => {
+            if (saved && action) {
+              client.setQueriesData<{items:Task[];total:number}>({queryKey:['tasks',wid]}, old => {
+                if (!old) return old;
+                const exists=old.items.some(item=>item.id===saved.id);
+                if(action==='deleted')return {...old,items:old.items.filter(item=>item.id!==saved.id),total:Math.max(0,old.total-(exists?1:0))};
+                return {...old,items:exists?old.items.map(item=>item.id===saved.id?saved:item):[saved,...old.items],total:old.total+(exists?0:1)};
+              });
+              setToast(action==='created'?'Task created successfully':action==='deleted'?'Task deleted':'Task saved successfully');
+            }
+            void refresh();
+          }}
           readOnly={readOnly}
           restricted={restricted}
           initialDate={initialDate}
