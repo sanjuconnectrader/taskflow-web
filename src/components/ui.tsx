@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import { X, Layers, LoaderCircle, Eye, EyeOff } from "lucide-react";
 import { label, Task } from "@/lib/types";
@@ -88,12 +88,23 @@ export function Modal({
   children: React.ReactNode;
   wide?: boolean;
 }) {
+  const [viewport, setViewport] = useState<{height:number;top:number}>();
+  useEffect(() => {
+    if (!open || !window.visualViewport) return;
+    const visual = window.visualViewport;
+    const update = () => setViewport({height:visual.height,top:visual.offsetTop});
+    update();
+    visual.addEventListener('resize',update);
+    visual.addEventListener('scroll',update);
+    return () => {visual.removeEventListener('resize',update);visual.removeEventListener('scroll',update);};
+  }, [open]);
   return (
     <Dialog.Root open={open} onOpenChange={(v) => !v && onClose()}>
       <Dialog.Portal>
         <Dialog.Overlay className="modal-overlay" />
         <Dialog.Content
           className={`modal ${wide ? "wide" : ""}`}
+          style={viewport ? {'--modal-height':`${viewport.height}px`,'--modal-top':`${viewport.top}px`} as React.CSSProperties : undefined}
           aria-describedby={undefined}
         >
           <header className="modal-header">

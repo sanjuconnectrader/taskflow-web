@@ -2467,7 +2467,17 @@ hr {
   input,select,textarea { max-width:100%; font-size:16px; }
   .card-header { flex-wrap:wrap; gap:14px; }
   .card-header .inline { flex-wrap:wrap; max-width:100%; }
-  .modal { max-width:calc(100vw - 24px); max-height:calc(100dvh - 32px); overflow-y:auto; }
+  .modal, .modal.wide { left:0; top:var(--modal-top,0px); transform:none; width:100%; max-width:100%; height:var(--modal-height,100dvh); max-height:var(--modal-height,100dvh); overflow-y:auto; overflow-x:hidden; overscroll-behavior:contain; border-radius:0; }
+  .task-form, .padded-form { padding:16px; }
+  .task-form-grid, .task-form-grid > aside { grid-template-columns:minmax(0,1fr); }
+  .task-form-grid > *, .task-form label, .task-form .inline { min-width:0; }
+  .task-form input, .task-form select, .task-form textarea { width:100%; min-width:0; }
+  .task-form input[type="checkbox"] { width:auto; }
+  .task-form .inline { flex-wrap:wrap; }
+  .task-form .inline input { flex:1 1 160px; }
+  .form-footer, .form-footer > div { flex-wrap:wrap; gap:10px; }
+  .form-footer { padding-bottom:calc(12px + env(safe-area-inset-bottom)); }
+  .form-footer button { min-height:44px; }
   .calendar-screen .calendar-day { min-height:56px; padding:5px 0; text-align:center; }
   .calendar-screen .calendar-event { display:none; }
   .calendar-screen .calendar.week { grid-template-columns:repeat(7,minmax(0,1fr)); }
