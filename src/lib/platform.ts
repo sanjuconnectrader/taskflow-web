@@ -3,6 +3,7 @@ declare global {
   interface Window {
     taskflow?: {
       platform: string;
+      getVersion?: () => Promise<string>;
       getSession: () => Promise<string | null>;
       setSession: (token: string | null) => Promise<void>;
       onUpdateStatus?: (callback: (status: {state: string; percent?: number}) => void) => () => void;
