@@ -40,6 +40,13 @@ jobs:
       VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
       NEXT_PUBLIC_API_URL: ${{ vars.API_PUBLIC_URL }}
     steps:
+      - name: Require configured production approval protection
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          rules=$(gh api "repos/$GITHUB_REPOSITORY/environments/production" --jq '[.protection_rules[] | select(.type == "required_reviewers")] | length')
+          test "$rules" -gt 0 || { echo "Configure required reviewers on the production environment before production releases."; exit 1; }
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:

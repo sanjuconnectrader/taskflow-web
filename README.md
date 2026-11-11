@@ -44,6 +44,8 @@ The dashboard follows the supplied TaskFlow reference: fixed sidebar/header, fou
 
 Build the same `out/` once, then use the native repositories' `npm run assets`. Their workflows build an immutable `FRONTEND_REF` from this repository and bundle it. Production native apps do not navigate to the Vercel-hosted UI.
 
-Browser sessions use HttpOnly cookies. Desktop and Android adapters persist opaque session tokens through OS-backed native bridges; browser localStorage contains only nonsensitive workspace/sidebar preferences. There is no complete offline queue: writes require a network connection. Dashboard/board/calendar previews currently use the first 100 task records and show a limit notice for larger workspaces; the task page is paginated. Reports aggregate all matching records on the server. Details are modals rather than shareable task URL deep links.
+Browser sessions use HttpOnly cookies. Desktop and Android adapters persist opaque session tokens through OS-backed native bridges; browser localStorage contains only nonsensitive workspace/sidebar and API-origin preferences. There is no complete offline queue: writes require a network connection. Dashboard/board/calendar previews currently use the first 100 task records and show a limit notice for larger workspaces; the task page is paginated. Reports aggregate all matching records on the server. Details are modals rather than shareable task URL deep links.
 
 See [DEPLOYMENT.md](DEPLOYMENT.md) for Vercel setup, domain/cookie configuration, GitHub secrets, tag releases and deployment approvals.
+
+The sign-in screen's **API connection settings** can override the public build-time API address with an operator-provided HTTPS origin. Native credentials are cleared before changing origins. Choose the same backend on every client.

@@ -1,5 +1,39 @@
-import { currentToken } from "./platform";
-export const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+import { currentToken, saveSession } from "./platform";
+const configuredAPI =
+  process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+let override: string | null = null;
+if (typeof window !== "undefined") {
+  try {
+    override = localStorage.getItem("taskflow-api-origin");
+  } catch {}
+}
+export const API = override || configuredAPI;
+export async function configureAPI(value: string) {
+  const url = new URL(value);
+  if (
+    url.username ||
+    url.password ||
+    url.pathname !== "/" ||
+    url.search ||
+    url.hash
+  )
+    throw new Error(
+      "Enter only the API origin, without credentials or a path.",
+    );
+  if (
+    url.protocol !== "https:" &&
+    !(
+      url.protocol === "http:" &&
+      ["localhost", "127.0.0.1"].includes(url.hostname)
+    )
+  )
+    throw new Error(
+      "Use HTTPS. HTTP is only supported for localhost development.",
+    );
+  await saveSession(null);
+  localStorage.setItem("taskflow-api-origin", url.origin);
+  location.reload();
+}
 if (
   process.env.NODE_ENV === "production" &&
   !API.startsWith("https://") &&
