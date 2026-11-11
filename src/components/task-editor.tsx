@@ -22,7 +22,7 @@ export function TaskEditor({
   members: Member[];
   wid: string;
   onClose: () => void;
-  onSaved: (task?: Task, action?: "created" | "updated" | "deleted") => void;
+  onSaved: (task?: Task, action?: "created" | "updated" | "deleted") => void | Promise<void>;
   readOnly?: boolean;
   initialDate?: string;
   restricted?: boolean;
@@ -77,7 +77,7 @@ export function TaskEditor({
         },
         task ? "PATCH" : "POST",
       );
-      onSaved(saved, task ? "updated" : "created");
+      await onSaved(saved, task ? "updated" : "created");
       onClose();
     } catch (e) {
       setError(e);
@@ -94,7 +94,7 @@ export function TaskEditor({
         remove ? undefined : { ...data, version: task.version },
         remove ? "DELETE" : "PATCH",
       );
-      onSaved(remove ? task : saved, remove ? "deleted" : "updated");
+      await onSaved(remove ? task : saved, remove ? "deleted" : "updated");
       onClose();
     } catch (e) {
       setError(e);

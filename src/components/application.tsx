@@ -253,6 +253,15 @@ function WorkspaceApp({
     enabled: searchOpen && search.trim().length > 1 && !!wid,
   });
   const refresh = () => client.invalidateQueries();
+  useEffect(() => {
+    // Every successful mutation (including projects, members and comments)
+    // refreshes subscribers; cancelled requests cannot overwrite fresh results.
+    const sync = () => { void client.cancelQueries().then(() => client.invalidateQueries()); };
+    window.addEventListener('taskflow:data-changed', sync);
+    const visible = () => { if(document.visibilityState==='visible') sync(); };
+    document.addEventListener('visibilitychange',visible);
+    return () => {window.removeEventListener('taskflow:data-changed',sync);document.removeEventListener('visibilitychange',visible);};
+  }, [client]);
   const move = useMutation({
     mutationFn: ({ task, status }: { task: Task; status: Status }) =>
       send(
@@ -335,10 +344,23 @@ function WorkspaceApp({
       withCredentials: true,
       auth: currentToken() ? { token: currentToken() } : undefined,
     });
+    let joined = false;
+    const join = () => {
+      socket.timeout(10000).emit('workspace:join',wid,(error:Error|null,result?:{ok:boolean}) => {
+        joined=!error && result?.ok===true;
+        if(joined) void client.invalidateQueries();
+      });
+    };
     socket.on("connect", () => {
-      socket.emit("workspace:join", wid);
-      client.invalidateQueries();
+      join();
     });
+    socket.on('disconnect',()=>{joined=false;});
+    socket.on('connect_error',()=>{joined=false;});
+    // Keep data current if a proxy or device blocks the live connection.
+    const fallback = setInterval(()=>{
+      if(document.visibilityState!=='visible'||!navigator.onLine)return;
+      if(!joined){void client.invalidateQueries();if(socket.connected)join();else socket.connect();}
+    },15000);
     socket.on("invalidate", () => client.invalidateQueries());
     socket.on("notification", (event: {title:string;message?:string}) => {
       client.invalidateQueries({queryKey:["notifications",wid]});
@@ -346,6 +368,7 @@ function WorkspaceApp({
       if (user.preferences?.notifications !== false && "Notification" in window && Notification.permission === "granted") new Notification(event.title,{body:event.message || "TaskFlow notification"});
     });
     return () => {
+      clearInterval(fallback);
       socket.disconnect();
     };
   }, [wid, client]);
@@ -862,7 +885,8 @@ function WorkspaceApp({
           members={members.data || []}
           wid={wid}
           onClose={() => setEditor(undefined)}
-          onSaved={(saved, action) => {
+          onSaved={async (saved, action) => {
+            await client.cancelQueries({queryKey:['tasks',wid]});
             if (saved && action) {
               client.setQueriesData<{items:Task[];total:number}>({queryKey:['tasks',wid]}, old => {
                 if (!old) return old;

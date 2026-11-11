@@ -17,6 +17,7 @@ export async function request<T = any>(
 ): Promise<T> {
   const result = await fetch(`${API}/api/v1${path}`, {
     ...options,
+    cache: "no-store",
     credentials: "include",
     headers: {
       "Content-Type": "application/json",
@@ -36,7 +37,10 @@ export async function request<T = any>(
       details || data?.error?.message || `Request failed (${result.status}).`,
     );
   }
-  return result.json();
+  const data = await result.json();
+  if (!['GET','HEAD'].includes((options.method || 'GET').toUpperCase()))
+    window.dispatchEvent(new Event('taskflow:data-changed'));
+  return data;
 }
 export const send = (path: string, data: unknown, method = "POST") =>
   request(path, { method, body: JSON.stringify(data) });
