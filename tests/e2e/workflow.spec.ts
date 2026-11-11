@@ -7,6 +7,10 @@ test("register, create a project and task, persist completion, and navigate", as
   await page
     .getByRole("button", { name: "Create an account", exact: true })
     .click();
+  await page.getByLabel('Company name').fill(`E2E Company ${suffix}`);
+  await page.getByLabel('Company email').fill(`company_${suffix}@taskflow.test`);
+  await page.getByRole('button',{name:/Continue to administrator setup/}).click();
+  await page.getByLabel('Full name').fill('E2E Owner');
   await page.getByLabel("Username", { exact: true }).fill(`e2e_${suffix}`);
   await page.getByLabel("Email address").fill(`e2e_${suffix}@taskflow.test`);
   await page

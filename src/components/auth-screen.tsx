@@ -15,14 +15,17 @@ const schema = z.object({
   acceptedTerms: z.boolean().optional(),
   explanation: z.string().optional(),
   authorization: z.string().optional(),
+  fullName: z.string().optional(),
+  designation: z.string().optional(),
 });
 type Fields = z.infer<typeof schema>;
 export function AuthScreen({ onLogin }: { onLogin: () => void }) {
-  const [mode, setMode] = useState<"login" | "register" | "recovery" | "reset">(
+  const [mode, setMode] = useState<"login" | "company" | "register" | "recovery" | "reset">(
     "login",
   );
   const [error, setError] = useState<unknown>();
   const [message, setMessage] = useState("");
+  const [company, setCompany] = useState<Record<string, string> | null>(null);
   const {
     register,
     handleSubmit,
@@ -69,6 +72,7 @@ export function AuthScreen({ onLogin }: { onLogin: () => void }) {
       }
       const result = await send(`/auth/${mode}`, {
         ...data,
+        ...(mode === "register" ? {company} : {}),
         native: isNative(),
       });
       if (result.token) await saveSession(result.token);
@@ -119,8 +123,8 @@ export function AuthScreen({ onLogin }: { onLogin: () => void }) {
           <h1>
             {mode === "login"
               ? "Welcome back"
-              : mode === "register"
-                ? "Create your account"
+              : mode === "company" ? "Create your company" : mode === "register"
+                ? "Set up your administrator"
                 : mode === "reset"
                   ? "Choose a new password"
                   : "Forgot your password?"}
@@ -128,8 +132,8 @@ export function AuthScreen({ onLogin }: { onLogin: () => void }) {
           <p className="muted">
             {mode === "login"
               ? "Sign in to pick up where you left off."
-              : mode === "register"
-                ? "A little more focus. A lot more possibility."
+              : mode === "company" ? "First, tell us about your organization." : mode === "register"
+                ? "Your account will be the company owner."
                 : mode === "reset"
                   ? "Enter the authorization from your verified administrator."
                   : "Please contact your workspace administrator to recover access to your account. Your administrator will verify your identity and provide secure reset instructions."}
@@ -141,9 +145,23 @@ export function AuthScreen({ onLogin }: { onLogin: () => void }) {
                 Back to sign in
               </button>
             </div>
+          ) : mode === "company" ? (
+            <form onSubmit={e => {e.preventDefault(); setCompany(Object.fromEntries(new FormData(e.currentTarget)) as Record<string,string>); change("register");}}>
+              <label>Company name<input name="name" required maxLength={150} /></label>
+              <label>Company email<input name="email" type="email" required /></label>
+              <label>Phone (optional)<input name="phone" type="tel" /></label>
+              <label>Website (optional)<input name="website" type="url" placeholder="https://example.com" /></label>
+              <label>Address (optional)<input name="address" /></label>
+              <label>Industry (optional)<input name="industry" /></label>
+              <label>Company size (optional)<input name="companySize" /></label>
+              <label>Time zone<input name="timezone" required defaultValue={Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC"} /></label>
+              <button className="primary full">Continue to administrator setup <ArrowRight size={17} /></button>
+            </form>
           ) : (
             <form onSubmit={submit}>
               {mode === "register" && (
+                <><label>Full name<input {...register("fullName")} required autoComplete="name" /></label>
+                <label>Job designation<input {...register("designation")} /></label>
                 <label>
                   Username
                   <input
@@ -153,6 +171,7 @@ export function AuthScreen({ onLogin }: { onLogin: () => void }) {
                     required
                   />
                 </label>
+                </>
               )}
               <label>
                 Email address
@@ -255,7 +274,7 @@ export function AuthScreen({ onLogin }: { onLogin: () => void }) {
                 New to TaskFlow?{" "}
                 <button
                   className="text-button"
-                  onClick={() => change("register")}
+                  onClick={() => change("company")}
                 >
                   Create an account
                 </button>

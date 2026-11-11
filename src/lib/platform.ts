@@ -5,6 +5,7 @@ declare global {
       platform: string;
       getSession: () => Promise<string | null>;
       setSession: (token: string | null) => Promise<void>;
+      onUpdateStatus?: (callback: (status: {state: string; percent?: number}) => void) => () => void;
     };
   }
 }

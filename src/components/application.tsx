@@ -51,12 +51,15 @@ import {
   Report,
   Activity,
   Status,
-  Notification,
 } from "@/lib/types";
+import type { Notification } from "@/lib/types";
+import { label } from "@/lib/types";
 import { Logo, Avatar, Modal, Loading, ErrorNotice, Empty, Card } from "./ui";
 import { AuthScreen } from "./auth-screen";
 import { Dashboard, TaskTable } from "./dashboard";
 import { TaskEditor } from "./task-editor";
+import {StorageWarning} from './storage-warning';
+import {AppUpdates} from './app-updates';
 import {
   CalendarView,
   ProjectsView,
@@ -127,13 +130,33 @@ function Session() {
   }, [me.data]);
   if (!ready || (!expired && me.isPending)) return <Loading />;
   if (expired || me.isError || !me.data) return <AuthScreen onLogin={login} />;
+  if (me.data.mustChangePassword) return <SetPassword onDone={login} onLogout={logout} />;
   return <WorkspaceApp user={me.data} onLogout={logout} />;
+}
+function SetPassword({onDone, onLogout}: {onDone: () => void; onLogout: () => void}) {
+  const [error, setError] = useState<unknown>();
+  const [busy, setBusy] = useState(false);
+  return <main className="auth-page"><section className="auth-panel"><div className="auth-form">
+    <Logo /><h1>Set Your New Password</h1><p className="muted">Choose a new password before accessing your company workspace.</p>
+    <form onSubmit={async e => {e.preventDefault(); setBusy(true); setError(null); try {
+      const result = await send("/auth/password", Object.fromEntries(new FormData(e.currentTarget)));
+      if (result.token) await saveSession(result.token);
+      onDone();
+    } catch (err) {setError(err);} finally {setBusy(false);}}}>
+      <label>Current temporary password<input name="currentPassword" type="password" autoComplete="current-password" required /></label>
+      <label>New password<input name="password" type="password" minLength={12} maxLength={128} autoComplete="new-password" required /></label>
+      <label>Confirm new password<input name="confirmPassword" type="password" minLength={12} maxLength={128} autoComplete="new-password" required /></label>
+      <ErrorNotice error={error} /><button className="primary full" disabled={busy}>{busy ? "Saving…" : "Set Password"}</button>
+      <button type="button" onClick={onLogout}>Sign Out</button>
+    </form>
+  </div></section></main>;
 }
 const nav = [
   { id: "dashboard", name: "Dashboard", icon: LayoutDashboard },
   { id: "tasks", name: "My Tasks", icon: CheckSquare },
   { id: "projects", name: "Projects", icon: Folder },
   { id: "calendar", name: "Calendar", icon: CalendarDays },
+  { id: "notifications", name: "Notifications", icon: Bell },
   { id: "team", name: "Team", icon: Users },
   { id: "messages", name: "Messages", icon: MessageCircle },
   { id: "files", name: "Files", icon: Files },
@@ -175,6 +198,8 @@ function WorkspaceApp({
     memberships.data?.[0];
   const wid = membership?.workspaceId || "";
   const admin = ["OWNER", "ADMIN"].includes(membership?.role || "");
+  const manager = membership?.role === 'PROJECT_MANAGER' || membership?.role === 'TEAM_LEAD';
+  const restricted = (membership?.role === 'EMPLOYEE' || !!membership?.employeeId || !!membership?.workspace.enforceProjectAccess) && !admin && !manager;
   const readOnly =
     membership?.role === "VIEWER" || !!membership?.workspace.archived;
   const base = `/workspaces/${wid}`;
@@ -193,7 +218,7 @@ function WorkspaceApp({
     queryKey: ["tasks", wid, page, taskSearch],
     queryFn: () =>
       request(
-        `${base}/tasks?limit=100&page=${page}${taskSearch ? `&search=${encodeURIComponent(taskSearch)}` : ""}`,
+        `${base}/tasks?summary=true&limit=100&page=${page}${taskSearch ? `&search=${encodeURIComponent(taskSearch)}` : ""}`,
       ),
     enabled: !!wid,
   });
@@ -309,16 +334,21 @@ function WorkspaceApp({
       client.invalidateQueries();
     });
     socket.on("invalidate", () => client.invalidateQueries());
+    socket.on("notification", (event: {title:string;message?:string}) => {
+      client.invalidateQueries({queryKey:["notifications",wid]});
+      setToast(event.message ? `${event.title}: ${event.message}` : event.title);
+      if (user.preferences?.notifications !== false && "Notification" in window && Notification.permission === "granted") new Notification(event.title,{body:event.message || "TaskFlow notification"});
+    });
     return () => {
       socket.disconnect();
     };
   }, [wid, client]);
-  const openTask = (t: Task) => {
+  const openTask = async (t: Task) => {
     setInitialDate(undefined);
-    setEditor(t);
+    try {setEditor(await request<Task>(`${base}/tasks/${t.id}`));}catch(error){setError(error);}
   };
   const createTask = (date?: string) => {
-    if (readOnly) return;
+    if (readOnly || restricted) return;
     setInitialDate(date);
     setEditor(null);
   };
@@ -389,6 +419,7 @@ function WorkspaceApp({
   );
   return (
     <div className={`app-shell ${ui.collapsed ? "sidebar-collapsed" : ""}`}>
+      <AppUpdates />
       <div
         className={`drawer-scrim ${drawer ? "visible" : ""}`}
         onClick={() => setDrawer(false)}
@@ -405,7 +436,7 @@ function WorkspaceApp({
           </button>
         </div>
         <nav aria-label="Main navigation">
-          {nav.map((n) => (
+          {nav.filter(n => !restricted || !['team','reports'].includes(n.id)).map((n) => (
             <button
               key={n.id}
               className={`nav-item ${tab === n.id ? "active" : ""}`}
@@ -414,7 +445,7 @@ function WorkspaceApp({
               aria-current={tab === n.id ? "page" : undefined}
             >
               <n.icon size={21} />
-              <span>{n.name}</span>
+              <span>{restricted && n.id === 'projects' ? 'My Projects' : restricted && n.id === 'settings' ? 'Profile' : n.name}</span>
               {n.id === "messages" && unread > 0 && <b>{unread}</b>}
             </button>
           ))}
@@ -471,7 +502,7 @@ function WorkspaceApp({
             <kbd>⌘ K</kbd>
           </button>
           <div className="header-actions">
-            {!readOnly && (
+            {!readOnly && !restricted && (
               <button
                 className="primary header-create"
                 onClick={() => createTask()}
@@ -482,7 +513,7 @@ function WorkspaceApp({
             <button
               className="icon-button notification-trigger"
               aria-label={`Notifications, ${unread} unread`}
-              onClick={() => setNotificationsOpen(true)}
+              onClick={() => navigate("notifications")}
             >
               <Bell size={21} />
               {unread > 0 && <i />}
@@ -574,6 +605,7 @@ function WorkspaceApp({
               )}
             </div>
           </div>
+          {admin&&wid&&<StorageWarning wid={wid} onOpen={()=>navigate('settings')}/>}
           <ErrorNotice
             error={
               error ||
@@ -705,6 +737,7 @@ function WorkspaceApp({
               {tab === "projects" && (
                 <ProjectsView
                   projects={projects.data || []}
+                  members={members.data || []}
                   tasks={allTasks}
                   onOpen={openTask}
                   onCreate={() => createTask()}
@@ -715,6 +748,7 @@ function WorkspaceApp({
                   onRefresh={refresh}
                   wid={wid}
                   admin={admin && !readOnly}
+                  manager={membership?.role === 'PROJECT_MANAGER' && !readOnly}
                   readOnly={readOnly}
                 />
               )}
@@ -743,6 +777,17 @@ function WorkspaceApp({
                   user={user}
                 />
               )}
+              {tab === "notifications" && (
+                <NotificationsPage
+                  notifications={notifications.data || []}
+                  onOpen={async (n) => {
+                    await send(`${base}/notifications/read`, { id: n.id });
+                    if (n.taskId) openTask(await request(`${base}/tasks/${n.taskId}`));
+                    refresh();
+                  }}
+                  onRead={async (id) => { await send(`${base}/notifications/read`, id ? { id } : {}); refresh(); }}
+                />
+              )}
               {tab === "files" && (
                 <FilesView wid={wid} tasks={allTasks} onOpen={openTask} />
               )}
@@ -759,7 +804,9 @@ function WorkspaceApp({
                   user={user}
                   wid={wid}
                   workspaceName={membership?.workspace.name || ""}
+                  workspace={membership?.workspace}
                   owner={membership?.role === "OWNER"}
+                  storageAdmin={admin}
                   onRefresh={refresh}
                   onLogout={onLogout}
                 />
@@ -792,7 +839,7 @@ function WorkspaceApp({
           </button>
         ))}
       </nav>
-      {!readOnly && (
+      {!readOnly && !restricted && (
         <button
           className="mobile-fab"
           aria-label="Create task"
@@ -811,6 +858,7 @@ function WorkspaceApp({
           onClose={() => setEditor(undefined)}
           onSaved={refresh}
           readOnly={readOnly}
+          restricted={restricted}
           initialDate={initialDate}
         />
       )}
@@ -929,4 +977,13 @@ function WorkspaceApp({
       )}
     </div>
   );
+}
+function NotificationsPage({notifications,onOpen,onRead}:{notifications:Notification[];onOpen:(notification:Notification)=>Promise<void>;onRead:(id?:string)=>Promise<void>}) {
+  const [status,setStatus]=useState<'all'|'unread'|'read'>('all');
+  const [type,setType]=useState('all');
+  const types=[...new Set(notifications.map(n=>n.type))];
+  const shown=notifications.filter(n=>(status==='all'||(status==='read')===n.read)&&(type==='all'||n.type===type));
+  return <Card title="Notifications" subtitle="Updates from your authorized projects" action={<div className="inline"><select aria-label="Notification status" value={status} onChange={e=>setStatus(e.target.value as typeof status)}><option value="all">All</option><option value="unread">Unread</option><option value="read">Read</option></select><select aria-label="Notification type" value={type} onChange={e=>setType(e.target.value)}><option value="all">All types</option>{types.map(value=><option key={value} value={value}>{label(value)}</option>)}</select><button className="text-button" onClick={()=>onRead()}>Mark all as read</button></div>}>
+    <div className="notifications-list">{shown.map(n=><button key={n.id} className={n.read?'notification read':'notification'} onClick={()=>onOpen(n)}><Bell size={18}/><span><strong>{n.title}</strong>{n.message&&<small>{n.message}</small>}<small>{new Date(n.createdAt).toLocaleString()}</small></span></button>)}{!shown.length&&<Empty title="You’re all caught up"/>}</div>
+  </Card>;
 }

@@ -43,7 +43,7 @@ function Tile({
           aria-label={`Move ${task.title}`}
         >
           <CheckSquare size={13} />
-          {task.checklist.filter((c) => c.done).length}/{task.checklist.length}
+          {task.checklistSummary?.completed??task.checklist?.filter((c) => c.done).length??0}/{task.checklistSummary?.total??task.checklist?.length??0}
         </span>
         <div className="avatar-stack">
           {task.assignees.slice(0, 2).map((a) => (
@@ -120,7 +120,7 @@ export function Board({
       t &&
       e.over &&
       t.status !== e.over.id &&
-      ["TODO", "IN_PROGRESS", "IN_REVIEW", "COMPLETED", "CANCELLED"].includes(
+      ["TODO", "IN_PROGRESS", "IN_REVIEW", "BLOCKED", "COMPLETED", "CANCELLED"].includes(
         String(e.over.id),
       )
     )
@@ -131,7 +131,7 @@ export function Board({
       <div className={`board ${compact ? "compact" : ""}`}>
         {(compact
           ? ["TODO", "IN_PROGRESS", "COMPLETED"]
-          : ["TODO", "IN_PROGRESS", "IN_REVIEW", "COMPLETED", "CANCELLED"]
+          : ["TODO", "IN_PROGRESS", "IN_REVIEW", "BLOCKED", "COMPLETED", "CANCELLED"]
         ).map((s) => (
           <Column
             key={s}

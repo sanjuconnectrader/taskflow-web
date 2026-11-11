@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import {usePagedQuery} from '@/lib/paged-query';
 import { Plus, Trash2, Send, Paperclip } from "lucide-react";
 import { request, send } from "@/lib/api";
 import { Task, Project, Member, Comment, statuses, label } from "@/lib/types";
@@ -14,6 +15,7 @@ export function TaskEditor({
   onSaved,
   readOnly = false,
   initialDate,
+  restricted = false,
 }: {
   task?: Task;
   projects: Project[];
@@ -23,6 +25,7 @@ export function TaskEditor({
   onSaved: () => void;
   readOnly?: boolean;
   initialDate?: string;
+  restricted?: boolean;
 }) {
   const [title, setTitle] = useState(task?.title || "");
   const [description, setDescription] = useState(task?.description || "");
@@ -31,6 +34,7 @@ export function TaskEditor({
   );
   const [status, setStatus] = useState(task?.status || "TODO");
   const [priority, setPriority] = useState(task?.priority || "MEDIUM");
+  const [requiresReview, setRequiresReview] = useState(task?.requiresReview || false);
   const [dueDate, setDue] = useState(task?.dueDate || initialDate || "");
   const [startDate, setStart] = useState(task?.startDate || "");
   const [assigneeIds, setAssignees] = useState(
@@ -45,11 +49,8 @@ export function TaskEditor({
   const [error, setError] = useState<unknown>();
   const [busy, setBusy] = useState(false);
   const base = `/workspaces/${wid}`;
-  const comments = useQuery<Comment[]>({
-    queryKey: ["comments", wid, task?.id],
-    queryFn: () => request(`${base}/comments?taskId=${task!.id}`),
-    enabled: !!task,
-  });
+  const comments=usePagedQuery<Comment>(['comments',wid,task?.id],`${base}/comments?paged=true&taskId=${task?.id}`,!!task);
+  const [optimizeImages,setOptimizeImages]=useState(false);
   const save = async (e: React.FormEvent) => {
     e.preventDefault();
     setBusy(true);
@@ -57,12 +58,13 @@ export function TaskEditor({
     try {
       await send(
         task ? `${base}/tasks/${task.id}` : `${base}/tasks`,
-        {
+        restricted && task ? {status,checklist,version:task.version} : {
           title,
           description,
           projectId,
           status,
           priority,
+          requiresReview,
           dueDate: dueDate || null,
           startDate: startDate || null,
           assigneeIds,
@@ -108,6 +110,7 @@ export function TaskEditor({
         name: file.name,
         mime: file.type,
         size: file.size,
+        optimizeImage:optimizeImages,
       });
       const uploaded = await fetch(result.url, {
         method: "PUT",
@@ -138,6 +141,7 @@ export function TaskEditor({
               <label>
                 Task title
                 <input
+                  disabled={restricted}
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
                   maxLength={250}
@@ -149,6 +153,7 @@ export function TaskEditor({
               <label>
                 Description
                 <textarea
+                  disabled={restricted}
                   rows={5}
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
@@ -182,6 +187,7 @@ export function TaskEditor({
                     </label>
                     <button
                       type="button"
+                      disabled={restricted}
                       className="icon-button"
                       aria-label="Remove checklist item"
                       onClick={() =>
@@ -195,6 +201,7 @@ export function TaskEditor({
               </div>
               <div className="inline">
                 <input
+                  disabled={restricted}
                   value={checkText}
                   onChange={(e) => setCheckText(e.target.value)}
                   placeholder="Add checklist item"
@@ -202,6 +209,7 @@ export function TaskEditor({
                 />
                 <button
                   type="button"
+                  disabled={restricted}
                   className="secondary"
                   onClick={() => {
                     if (checkText.trim()) {
@@ -216,6 +224,7 @@ export function TaskEditor({
                   <Plus size={16} />
                 </button>
               </div>
+              {task && <label className="check-label"><input type="checkbox" checked={optimizeImages} onChange={e=>setOptimizeImages(e.target.checked)}/>Resize/compress images to save space (original not kept)</label>}
               {task && (
                 <label className="upload-button">
                   <Paperclip size={16} /> Attach a file
@@ -230,9 +239,11 @@ export function TaskEditor({
               )}
             </div>
             <aside>
+              <label className="check-label"><input type="checkbox" checked={requiresReview} disabled={restricted} onChange={e=>setRequiresReview(e.target.checked)}/>Requires manager approval</label>
               <label>
                 Project
                 <select
+                  disabled={restricted}
                   value={projectId}
                   onChange={(e) => setProject(e.target.value)}
                   required
@@ -255,7 +266,7 @@ export function TaskEditor({
                   value={status}
                   onChange={(e) => setStatus(e.target.value as Task["status"])}
                 >
-                  {statuses.map((s) => (
+                  {statuses.filter(s=>!restricted || s !== 'CANCELLED').map((s) => (
                     <option key={s} value={s}>
                       {label(s)}
                     </option>
@@ -265,6 +276,7 @@ export function TaskEditor({
               <label>
                 Priority
                 <select
+                  disabled={restricted}
                   value={priority}
                   onChange={(e) => setPriority(e.target.value)}
                 >
@@ -277,6 +289,7 @@ export function TaskEditor({
                 Start date
                 <input
                   type="date"
+                  disabled={restricted}
                   value={startDate}
                   onChange={(e) => setStart(e.target.value)}
                 />
@@ -285,6 +298,7 @@ export function TaskEditor({
                 Due date
                 <input
                   type="date"
+                  disabled={restricted}
                   value={dueDate}
                   onChange={(e) => setDue(e.target.value)}
                 />
@@ -293,6 +307,7 @@ export function TaskEditor({
                 Assignees
                 <select
                   multiple
+                  disabled={restricted}
                   value={assigneeIds}
                   onChange={(e) =>
                     setAssignees(
@@ -300,7 +315,7 @@ export function TaskEditor({
                     )
                   }
                 >
-                  {members.map((m) => (
+                  {members.filter(m=>{const project=projects.find(p=>p.id===projectId);return !project?.restrictMembership || project.members?.some(member=>member.userId===m.userId);}).map((m) => (
                     <option value={m.userId} key={m.userId}>
                       {m.user.displayName}
                     </option>
@@ -313,6 +328,7 @@ export function TaskEditor({
               <label>
                 Labels
                 <input
+                  disabled={restricted}
                   value={tags}
                   onChange={(e) => setTags(e.target.value)}
                   placeholder="design, sprint-1"
@@ -324,7 +340,7 @@ export function TaskEditor({
         <ErrorNotice error={error} />
         <footer className="form-footer">
           <div>
-            {task && !readOnly && (
+            {task && !readOnly && !restricted && (
               <>
                 <button
                   className="text-button danger"
@@ -363,7 +379,7 @@ export function TaskEditor({
       {task && (
         <section className="comments-section">
           <h3>Conversation</h3>
-          {comments.data?.map((c) => (
+          {comments.items.map((c) => (
             <div className="comment" key={c.id}>
               <Avatar name={c.authorName} />
               <div>
@@ -373,6 +389,8 @@ export function TaskEditor({
               </div>
             </div>
           ))}
+          {comments.hasNextPage&&<button className="secondary" disabled={comments.isFetchingNextPage} onClick={()=>comments.fetchNextPage()}>Load more comments</button>}
+          <ErrorNotice error={comments.error}/>
           {!readOnly && (
             <form
               className="inline"

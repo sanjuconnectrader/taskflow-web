@@ -235,6 +235,7 @@ export function Dashboard({
                   value: report.byStatus.TODO || 0,
                   color: "#cbd5e1",
                 },
+                ...(report.byStatus.BLOCKED ? [{name:"Blocked",value:report.byStatus.BLOCKED,color:"#e07727"}] : []),
                 ...(report.byStatus.CANCELLED
                   ? [
                       {

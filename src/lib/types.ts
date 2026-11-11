@@ -3,6 +3,7 @@ export type User = {
   username: string;
   email: string;
   displayName: string;
+  mustChangePassword?: boolean;
   preferences: { theme?: string; reminders?: boolean; notifications?: boolean };
 };
 export type Workspace = {
@@ -10,14 +11,23 @@ export type Workspace = {
   name: string;
   description: string;
   archived: boolean;
+  enforceProjectAccess?: boolean;
+  companyEmail?: string | null;
+  phone?: string | null;
+  website?: string | null;
+  address?: string | null;
+  industry?: string | null;
+  companySize?: string | null;
+  timezone?: string;
 };
 export type Membership = {
   workspaceId: string;
   userId: string;
-  role: "OWNER" | "ADMIN" | "MEMBER" | "VIEWER";
+  role: "OWNER" | "ADMIN" | "MEMBER" | "VIEWER" | "PROJECT_MANAGER" | "TEAM_LEAD" | "EMPLOYEE";
+  employeeId?: string | null;
   workspace: Workspace;
 };
-export type Member = { userId: string; role: string; user: User };
+export type Member = { userId: string; role: string; user: User; employeeId?: string | null; designation?: string | null; department?: string | null };
 export type Project = {
   id: string;
   name: string;
@@ -26,11 +36,14 @@ export type Project = {
   dueDate: string | null;
   archived: boolean;
   _count: { tasks: number };
+  restrictMembership?: boolean;
+  members?: {userId: string}[];
 };
 export const statuses = [
   "TODO",
   "IN_PROGRESS",
   "IN_REVIEW",
+  "BLOCKED",
   "COMPLETED",
   "CANCELLED",
 ] as const;
@@ -43,6 +56,7 @@ export type Task = {
   project: { id: string; name: string; color: string };
   status: Status;
   priority: string;
+  requiresReview?: boolean;
   dueDate: string | null;
   startDate: string | null;
   creatorId: string;
@@ -54,6 +68,7 @@ export type Task = {
   completedAt: string | null;
   assignees: { userId: string; user: User }[];
   checklist: { id?: string; text: string; done: boolean }[];
+  checklistSummary?:{total:number;completed:number};
 };
 export type Report = {
   total: number;
@@ -89,7 +104,10 @@ export type Comment = {
 export type Notification = {
   id: string;
   title: string;
+  message: string;
+  type: string;
   taskId?: string;
+  projectId?: string;
   read: boolean;
   createdAt: string;
 };

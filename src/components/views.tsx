@@ -1,6 +1,8 @@
 "use client";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import {usePagedQuery} from '@/lib/paged-query';
+import {StoragePanel} from './storage-panel';
 import {
   format,
   startOfMonth,
@@ -39,6 +41,7 @@ import {
   Project,
   User,
   Report,
+  Workspace,
   Comment,
   label,
 } from "@/lib/types";
@@ -47,6 +50,7 @@ import { Board } from "./board";
 import { TaskTable } from "./dashboard";
 export function ProjectsView({
   projects,
+  members,
   tasks,
   onOpen,
   onCreate,
@@ -55,9 +59,11 @@ export function ProjectsView({
   onRefresh,
   wid,
   admin,
+  manager,
   readOnly,
 }: {
   projects: Project[];
+  members: Member[];
   tasks: Task[];
   onOpen: (t: Task) => void;
   onCreate: () => void;
@@ -66,6 +72,7 @@ export function ProjectsView({
   onRefresh: () => void;
   wid: string;
   admin: boolean;
+  manager: boolean;
   readOnly: boolean;
 }) {
   const [selected, setSelected] = useState("");
@@ -102,7 +109,7 @@ export function ProjectsView({
               </button>
             </>
           )}
-          {admin && (
+          {(admin || manager) && (
             <button className="primary" onClick={() => setEditor(null)}>
               <Plus size={16} /> New project
             </button>
@@ -125,7 +132,7 @@ export function ProjectsView({
                   >
                     <FolderOpen size={22} />
                   </span>
-                  {admin && (
+                  {(admin || manager) && (
                     <button
                       className="icon-button"
                       aria-label={`Edit ${p.name}`}
@@ -175,7 +182,7 @@ export function ProjectsView({
           subtitle={p?.description}
           action={
             <div className="inline">
-              {admin && p && (
+              {(admin || manager) && p && (
                 <button className="secondary" onClick={() => setEditor(p)}>
                   Edit project
                 </button>
@@ -225,6 +232,7 @@ export function ProjectsView({
                     description: f.get("description"),
                     color: f.get("color"),
                     dueDate: f.get("dueDate") || null,
+                    memberIds: f.getAll("memberIds"),
                   },
                   editor ? "PATCH" : "POST",
                 );
@@ -252,6 +260,11 @@ export function ProjectsView({
                 rows={3}
               />
             </label>
+            <label>Assigned employees
+              <select name="memberIds" multiple defaultValue={editor?.members?.map(m=>m.userId) || []}>
+                {members.map(m=><option key={m.userId} value={m.userId}>{m.user.displayName}{m.designation ? ` — ${m.designation}` : ''}{m.department ? ` · ${m.department}` : ''}</option>)}
+              </select><small className="muted">Use Ctrl/Cmd to select multiple people. Task assignees must be project members.</small>
+            </label>
             <div className="two-col">
               <label>
                 Color
@@ -272,7 +285,7 @@ export function ProjectsView({
             </div>
             <ErrorNotice error={error} />
             <div className="form-footer">
-              {editor && (
+              {editor && admin && (
                 <div className="inline">
                   <button
                     type="button"
@@ -448,6 +461,7 @@ export function TeamView({
 }) {
   const [error, setError] = useState<unknown>();
   const [search, setSearch] = useState("");
+  const [temporaryPassword, setTemporaryPassword] = useState<string | null>(null);
   return (
     <Card
       title="People make it happen"
@@ -474,6 +488,8 @@ export function TeamView({
               <div>
                 <strong>{m.user.displayName}</strong>
                 <small>{m.user.email}</small>
+                {(m.designation || m.department) && <small>{[m.designation,m.department].filter(Boolean).join(" · ")}</small>}
+                {m.employeeId && <small>{m.employeeId}</small>}
               </div>
               <span className="muted">
                 {
@@ -502,12 +518,19 @@ export function TeamView({
                     }
                   }}
                 >
-                  {["ADMIN", "MEMBER", "VIEWER"].map((r) => (
+                  {["ADMIN", "PROJECT_MANAGER", "TEAM_LEAD", "EMPLOYEE", "MEMBER", "VIEWER"].map((r) => (
                     <option key={r}>{r}</option>
                   ))}
                 </select>
               ) : (
                 <span className="badge todo">{label(m.role)}</span>
+              )}
+              {admin && m.role !== "OWNER" && (
+                <button className="text-button" onClick={async () => {
+                  const note = prompt(`After verifying ${m.user.displayName}'s identity, describe how you verified it:`);
+                  if (!note) return;
+                  try {const result = await send(`/workspaces/${wid}/employees/${m.userId}/reset-password`, {identityVerified:true, verificationNote:note}); setTemporaryPassword(result.temporaryPassword);} catch(e) {setError(e);}
+                }}>Reset password</button>
               )}
               {admin && m.role !== "OWNER" && (
                 <button
@@ -536,6 +559,18 @@ export function TeamView({
             </article>
           ))}
       </div>
+      {admin && temporaryPassword && <div className="padded-form" role="alert"><h3>One-time temporary password</h3><p>Share this privately with the employee. It cannot be viewed again.</p><code>{temporaryPassword}</code><div className="inline"><button type="button" onClick={() => navigator.clipboard.writeText(temporaryPassword)}>Copy</button><button type="button" onClick={() => setTemporaryPassword(null)}>Done</button></div></div>}
+      {admin && <form className="invite-form" onSubmit={async e => {
+        e.preventDefault(); const form=e.currentTarget; const values=Object.fromEntries(new FormData(form));
+        try {const result=await send(`/workspaces/${wid}/employees`, values); setTemporaryPassword(result.temporaryPassword); form.reset(); refresh();} catch(err) {setError(err);}
+      }}>
+        <h3>Create employee</h3><p className="muted">A temporary password will be shown once after creation.</p>
+        <div className="inline"><label>Full name<input name="fullName" required maxLength={100}/></label><label>Email<input name="email" type="email" required/></label></div>
+        <div className="inline"><label>Designation<input name="designation" list="designation-options" maxLength={100}/><datalist id="designation-options">{['Project Manager','Team Lead','Frontend Developer','Backend Developer','Full Stack Developer','UI/UX Designer','QA Engineer','DevOps Engineer','Business Analyst','Marketing Executive'].map(value=><option value={value} key={value}/>)}</datalist></label><label>Department<input name="department" maxLength={100}/></label></div>
+        <div className="inline"><label>Phone (optional)<input name="phone" type="tel"/></label><label>Employment status<select name="employmentStatus"><option value="ACTIVE">Active</option><option value="INACTIVE">Inactive</option></select></label></div>
+        <label>Company role<select name="role"><option value="EMPLOYEE">Employee</option><option value="PROJECT_MANAGER">Project Manager</option><option value="TEAM_LEAD">Team Lead</option></select></label>
+        <button className="primary">Create employee</button>
+      </form>}
       {admin && (
         <form
           className="invite-form"
@@ -600,11 +635,7 @@ export function MessagesView({
   const [project, setProject] = useState(projects[0]?.id || "");
   const [body, setBody] = useState("");
   const [error, setError] = useState<unknown>();
-  const query = useQuery<Comment[]>({
-    queryKey: ["discussions", wid, project],
-    queryFn: () => request(`/workspaces/${wid}/comments?projectId=${project}`),
-    enabled: !!project,
-  });
+  const query=usePagedQuery<Comment>(['discussions',wid,project],`/workspaces/${wid}/comments?paged=true&projectId=${project}`,!!project);
   return (
     <Card
       title="Project conversations"
@@ -625,7 +656,7 @@ export function MessagesView({
       }
     >
       <div className="discussion-list">
-        {query.data?.map((c) => (
+        {query.items.map((c) => (
           <article className="comment" key={c.id}>
             <Avatar name={c.authorName} />
             <div>
@@ -676,7 +707,8 @@ export function MessagesView({
             </div>
           </article>
         ))}
-        {!query.data?.length && (
+        {query.hasNextPage&&<button className="secondary" disabled={query.isFetchingNextPage} onClick={()=>query.fetchNextPage()}>Load more messages</button>}
+        {!query.items.length && (
           <Empty title="Start a conversation">
             Share an update or mention a teammate with @username.
           </Empty>
@@ -726,17 +758,14 @@ export function FilesView({
 }) {
   const [error, setError] = useState<unknown>();
   const [search, setSearch] = useState("");
-  const q = useQuery<{
-    enabled: boolean;
-    items: {
+  const q = usePagedQuery<{
       id: string;
       name: string;
       size: number;
       mime: string;
       createdAt: string;
       taskId: string;
-    }[];
-  }>({ queryKey: ["files", wid], queryFn: () => request(`/files/${wid}`) });
+  }>(['files',wid,search],`/files/${wid}?search=${encodeURIComponent(search)}`);
   return (
     <Card
       title="Workspace files"
@@ -750,14 +779,14 @@ export function FilesView({
         />
       }
     >
-      {q.data && !q.data.enabled && (
+      {q.data?.pages[0]?.enabled===false && (
         <p className="notice">
-          Your operator needs to configure private S3 storage before uploads are
+          Your operator needs to configure private file storage before uploads are
           available.
         </p>
       )}
       <div className="file-list">
-        {q.data?.items
+        {q.items
           .filter((f) => f.name.toLowerCase().includes(search.toLowerCase()))
           .map((f) => (
             <article key={f.id}>
@@ -806,7 +835,8 @@ export function FilesView({
             </article>
           ))}
       </div>
-      {!q.data?.items.length && (
+      {q.hasNextPage&&<button className="secondary load-more" disabled={q.isFetchingNextPage} onClick={()=>q.fetchNextPage()}>Load more files</button>}
+      {!q.items.length && (
         <Empty title="Everything in its place">
           Open a task to attach a PDF, image, or text file.
         </Empty>
@@ -939,14 +969,18 @@ export function SettingsView({
   user,
   wid,
   workspaceName,
+  workspace,
   owner,
+  storageAdmin=false,
   onRefresh,
   onLogout,
 }: {
   user: User;
   wid: string;
   workspaceName: string;
+  workspace?: Workspace;
   owner: boolean;
+  storageAdmin?:boolean;
   onRefresh: () => void;
   onLogout: () => void;
 }) {
@@ -983,6 +1017,7 @@ export function SettingsView({
           "appearance",
           "notifications",
           "workspace",
+          ...(storageAdmin?['storage']:[]),
           "recovery",
           "about",
         ].map((t) => (
@@ -1000,6 +1035,7 @@ export function SettingsView({
         ))}
       </nav>
       <Card title={label(tab)} subtitle="Make TaskFlow work for you.">
+        {tab==='storage'&&storageAdmin&&<StoragePanel wid={wid}/>}
         {tab === "profile" && (
           <form
             className="padded-form"
@@ -1174,15 +1210,22 @@ export function SettingsView({
                 <form
                   onSubmit={(e) => {
                     e.preventDefault();
-                    const name = new FormData(e.currentTarget).get("name");
-                    run(() => send(`/workspaces/${wid}`, { name }, "PATCH"));
+                    const fields = Object.fromEntries(new FormData(e.currentTarget));
+                    run(() => send(`/workspaces/${wid}`, fields, "PATCH"));
                   }}
                 >
                   <label>
                     Workspace name
                     <input name="name" defaultValue={workspaceName} required />
                   </label>
-                  <button className="primary">Save workspace</button>
+                  <label>Company email<input name="companyEmail" type="email" defaultValue={workspace?.companyEmail || ''}/></label>
+                  <label>Phone<input name="phone" type="tel" defaultValue={workspace?.phone || ''}/></label>
+                  <label>Website<input name="website" type="url" defaultValue={workspace?.website || ''}/></label>
+                  <label>Address<input name="address" defaultValue={workspace?.address || ''}/></label>
+                  <label>Industry<input name="industry" defaultValue={workspace?.industry || ''}/></label>
+                  <label>Company size<input name="companySize" defaultValue={workspace?.companySize || ''}/></label>
+                  <label>Time zone<input name="timezone" defaultValue={workspace?.timezone || 'UTC'} required/></label>
+                  <button className="primary">Save company settings</button>
                 </form>
                 <hr />
                 <button

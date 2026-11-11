@@ -24,7 +24,7 @@ jobs:
       - run: npm audit --omit=dev --audit-level=high
       - run: npm run build
         env:
-          NEXT_PUBLIC_API_URL: ${{ vars.API_PUBLIC_URL }}
+          NEXT_PUBLIC_API_URL: ${{ vars.API_PUBLIC_URL || 'https://taskflow-backend-ouuj.onrender.com' }}
       - uses: actions/upload-artifact@v4
         with:
           name: web-export
@@ -38,7 +38,7 @@ jobs:
       VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
       VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
       VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
-      NEXT_PUBLIC_API_URL: ${{ vars.API_PUBLIC_URL }}
+      NEXT_PUBLIC_API_URL: ${{ vars.API_PUBLIC_URL || 'https://taskflow-backend-ouuj.onrender.com' }}
     steps:
       - name: Require configured production approval protection
         shell: bash

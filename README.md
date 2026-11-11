@@ -6,11 +6,11 @@ The shared TaskFlow interface for web, Electron and Capacitor. Built with Next.j
 
 1. Install Node.js 22.14+ and start the TaskFlow backend on port 4000 (see the backend repository).
 2. `npm ci`.
-3. Copy `.env.example` to `.env.local` and set `NEXT_PUBLIC_API_URL` to the API origin (no `/api/v1` suffix). Local default: `http://localhost:4000`.
+3. For local backend development, copy `.env.example` to `.env.development.local` and set `NEXT_PUBLIC_API_URL` to `http://localhost:4000` (no `/api/v1` suffix).
 4. `npm run dev`, then open http://localhost:3000.
 5. Register an account, or use the explicit development seed credentials from the backend's ignored environment file.
 
-Windows PowerShell users can use `npm.cmd` and `npx.cmd`. Never add database passwords, S3 credentials, signing keys or deployment tokens to this project. Only the API origin is a public build variable. All three clients must use the same API origin in production.
+Windows PowerShell users can use `npm.cmd` and `npx.cmd`. Never add database passwords, S3 credentials, signing keys or deployment tokens to this project. Only the API origin is a public build variable. All three clients default to `https://taskflow-backend-ouuj.onrender.com` in production builds. Set `NEXT_PUBLIC_API_URL` explicitly in the build environment to override it. Next.js also loads `.env.local` for production builds, so remove any old localhost value there or replace it with the production origin before packaging; `.env.development.local` takes precedence during local development.
 
 ## Build and test
 
@@ -44,7 +44,7 @@ The dashboard follows the supplied TaskFlow reference: fixed sidebar/header, fou
 
 Build the same `out/` once, then use the native repositories' `npm run assets`. Their workflows build an immutable `FRONTEND_REF` from this repository and bundle it. Production native apps do not navigate to the Vercel-hosted UI.
 
-Browser sessions use HttpOnly cookies. Desktop and Android adapters persist opaque session tokens through OS-backed native bridges; browser localStorage contains only nonsensitive workspace/sidebar and API-origin preferences. There is no complete offline queue: writes require a network connection. Dashboard/board/calendar previews currently use the first 100 task records and show a limit notice for larger workspaces; the task page is paginated. Reports aggregate all matching records on the server. Details are modals rather than shareable task URL deep links.
+Browser sessions use HttpOnly cookies. Desktop and Android adapters persist opaque session tokens through OS-backed native bridges; browser localStorage contains nonsensitive workspace/sidebar preferences. There is no complete offline queue: writes require a network connection. Dashboard/board/calendar previews currently use the first 100 task records and show a limit notice for larger workspaces; the task page is paginated. Reports aggregate all matching records on the server. Details are modals rather than shareable task URL deep links.
 
 See [DEPLOYMENT.md](DEPLOYMENT.md) for Vercel setup, domain/cookie configuration, GitHub secrets, tag releases and deployment approvals.
 
