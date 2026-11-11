@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import {
   QueryClient,
   QueryClientProvider,
@@ -173,6 +173,12 @@ function WorkspaceApp({
   const client = useQueryClient();
   const ui = useUI();
   const [tab, setTab] = useState("dashboard");
+  const pageRef = useRef<HTMLElement>(null);
+  useLayoutEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: "instant" });
+    pageRef.current?.scrollTo({ top: 0, left: 0, behavior: "instant" });
+    pageRef.current?.parentElement?.scrollTo({ top: 0, left: 0, behavior: "instant" });
+  }, [tab]);
   const [drawer, setDrawer] = useState(false);
   const [online, setOnline] = useState(true);
   const [editor, setEditor] = useState<Task | null | undefined>();
@@ -556,7 +562,7 @@ function WorkspaceApp({
             changes. <button onClick={() => refresh()}>Retry</button>
           </div>
         )}
-        <main className="page-content">
+        <main className="page-content" ref={pageRef}>
           <div className="page-heading">
             <div>
               <h1>
@@ -584,7 +590,7 @@ function WorkspaceApp({
               </p>
             </div>
             <div className="heading-controls">
-              {["dashboard", "reports"].includes(tab) && (
+              {tab === "reports" && (
                 <div className="date-range">
                   <CalendarDays size={16} />
                   <input
