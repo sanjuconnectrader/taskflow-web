@@ -1,6 +1,7 @@
 "use client";
+import { useState } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
-import { X, Layers, LoaderCircle } from "lucide-react";
+import { X, Layers, LoaderCircle, Eye, EyeOff } from "lucide-react";
 import { label, Task } from "@/lib/types";
 export function Logo() {
   return (
@@ -139,4 +140,22 @@ export function ErrorNotice({ error }: { error: unknown }) {
       {error instanceof Error ? error.message : String(error)}
     </p>
   ) : null;
+}
+
+export function PasswordInput(props: React.ComponentProps<"input">) {
+  const [visible, setVisible] = useState(false);
+  return (
+    <span className="password-input">
+      <input {...props} type={visible ? "text" : "password"} />
+      <button
+        type="button"
+        className="password-toggle"
+        aria-label={visible ? "Hide password" : "Show password"}
+        aria-pressed={visible}
+        onClick={() => setVisible((value) => !value)}
+      >
+        {visible ? <EyeOff size={18} /> : <Eye size={18} />}
+      </button>
+    </span>
+  );
 }

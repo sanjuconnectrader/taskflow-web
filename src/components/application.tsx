@@ -54,7 +54,7 @@ import {
 } from "@/lib/types";
 import type { Notification } from "@/lib/types";
 import { label } from "@/lib/types";
-import { Logo, Avatar, Modal, Loading, ErrorNotice, Empty, Card } from "./ui";
+import { Logo, Avatar, Modal, Loading, ErrorNotice, Empty, Card, PasswordInput } from "./ui";
 import { AuthScreen } from "./auth-screen";
 import { Dashboard, TaskTable } from "./dashboard";
 import { TaskEditor } from "./task-editor";
@@ -143,9 +143,9 @@ function SetPassword({onDone, onLogout}: {onDone: () => void; onLogout: () => vo
       if (result.token) await saveSession(result.token);
       onDone();
     } catch (err) {setError(err);} finally {setBusy(false);}}}>
-      <label>Current temporary password<input name="currentPassword" type="password" autoComplete="current-password" required /></label>
-      <label>New password<input name="password" type="password" minLength={12} maxLength={128} autoComplete="new-password" required /></label>
-      <label>Confirm new password<input name="confirmPassword" type="password" minLength={12} maxLength={128} autoComplete="new-password" required /></label>
+      <label>Current temporary password<PasswordInput name="currentPassword" autoComplete="current-password" required /></label>
+      <label>New password<PasswordInput name="password" minLength={8} maxLength={128} autoComplete="new-password" required /></label>
+      <label>Confirm new password<PasswordInput name="confirmPassword" minLength={8} maxLength={128} autoComplete="new-password" required /></label>
       <ErrorNotice error={error} /><button className="primary full" disabled={busy}>{busy ? "Saving…" : "Set Password"}</button>
       <button type="button" onClick={onLogout}>Sign Out</button>
     </form>
@@ -982,8 +982,10 @@ function NotificationsPage({notifications,onOpen,onRead}:{notifications:Notifica
   const [status,setStatus]=useState<'all'|'unread'|'read'>('all');
   const [type,setType]=useState('all');
   const types=[...new Set(notifications.map(n=>n.type))];
-  const shown=notifications.filter(n=>(status==='all'||(status==='read')===n.read)&&(type==='all'||n.type===type));
+  const shown=notifications.filter(n=>(status==='all'||(status==='read')===n.read)&&(type==='all'||n.type===type)).sort((a,b)=>Date.parse(b.createdAt)-Date.parse(a.createdAt));
   return <Card title="Notifications" subtitle="Updates from your authorized projects" action={<div className="inline"><select aria-label="Notification status" value={status} onChange={e=>setStatus(e.target.value as typeof status)}><option value="all">All</option><option value="unread">Unread</option><option value="read">Read</option></select><select aria-label="Notification type" value={type} onChange={e=>setType(e.target.value)}><option value="all">All types</option>{types.map(value=><option key={value} value={value}>{label(value)}</option>)}</select><button className="text-button" onClick={()=>onRead()}>Mark all as read</button></div>}>
-    <div className="notifications-list">{shown.map(n=><button key={n.id} className={n.read?'notification read':'notification'} onClick={()=>onOpen(n)}><Bell size={18}/><span><strong>{n.title}</strong>{n.message&&<small>{n.message}</small>}<small>{new Date(n.createdAt).toLocaleString()}</small></span></button>)}{!shown.length&&<Empty title="You’re all caught up"/>}</div>
+    <div className="notification-summary"><span className="notification-emblem"><Bell size={24}/></span><div><strong>Your team, in the loop</strong><p>{notifications.filter(n=>!n.read).length} unread updates · Stay on top of your work</p></div></div>
+    <div className="notification-tabs" role="group" aria-label="Filter notifications">{(['all','unread','read'] as const).map(value=><button key={value} className={status===value?'active':''} aria-pressed={status===value} onClick={()=>setStatus(value)}>{label(value)}</button>)}</div>
+    <div className="notifications-list">{shown.map(n=><article key={n.id} className={`notification-row ${n.read?'read':'unread'}`}><button className="notification-content" onClick={()=>onOpen(n)}><span className="notification-emblem"><Bell size={19}/></span><span><small className="notification-category">{label(n.type)}</small><strong>{n.title}</strong>{n.message&&<p>{n.message}</p>}<time dateTime={n.createdAt}>{new Date(n.createdAt).toLocaleString(undefined,{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'})}</time></span></button>{!n.read&&<button className="notification-mark" aria-label={`Mark ${n.title} as read`} onClick={()=>onRead(n.id)}>Mark read</button>}</article>)}{!shown.length&&<Empty title="You’re all caught up"/>}</div>
   </Card>;
 }

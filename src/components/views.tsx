@@ -45,7 +45,7 @@ import {
   Comment,
   label,
 } from "@/lib/types";
-import { Card, Empty, Avatar, Modal, ErrorNotice } from "./ui";
+import { Card, Empty, Avatar, Modal, ErrorNotice, PasswordInput } from "./ui";
 import { Board } from "./board";
 import { TaskTable } from "./dashboard";
 export function ProjectsView({
@@ -349,6 +349,7 @@ export function CalendarView({
 }) {
   const [date, setDate] = useState(new Date());
   const [view, setView] = useState("month");
+  const [selected, setSelected] = useState(format(new Date(), "yyyy-MM-dd"));
   const begin =
     view === "month"
       ? startOfWeek(startOfMonth(date), { weekStartsOn: 1 })
@@ -364,11 +365,12 @@ export function CalendarView({
   const days = eachDayOfInterval({ start: begin, end });
   return (
     <Card
+      className="calendar-screen"
       title={format(date, "MMMM yyyy")}
       subtitle="A little perspective on what’s ahead."
       action={
         <div className="inline">
-          <button className="secondary" onClick={() => setDate(new Date())}>
+          <button className="secondary" onClick={() => {setDate(new Date());setSelected(format(new Date(), "yyyy-MM-dd"));}}>
             Today
           </button>
           <button
@@ -409,20 +411,22 @@ export function CalendarView({
         </div>
       }
     >
+      <div className="calendar-weekdays">{['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map(day=><span key={day}>{day}</span>)}</div>
       <div className={`calendar ${view}`}>
         {days.map((d) => {
           const key = format(d, "yyyy-MM-dd");
           return (
             <div
-              className={`calendar-day ${!isSameMonth(d, date) ? "other-month" : ""}`}
+              className={`calendar-day ${key===selected?'selected-day':''} ${!isSameMonth(d, date) ? "other-month" : ""}`}
               key={key}
             >
               <button
-                onClick={() => onCreate(key)}
+                onClick={() => setSelected(key)}
                 className={
                   key === format(new Date(), "yyyy-MM-dd") ? "today" : ""
                 }
-                aria-label={`Create task on ${key}`}
+                aria-label={`Select ${key}`}
+                aria-pressed={key===selected}
               >
                 {format(d, view === "month" ? "d" : "EEE d")}
               </button>
@@ -437,10 +441,16 @@ export function CalendarView({
                     {t.title}
                   </button>
                 ))}
+              {tasks.some(t=>t.dueDate===key)&&<span className="calendar-dot" aria-label="Tasks scheduled"/>}
             </div>
           );
         })}
       </div>
+      <section className="calendar-agenda" aria-label="Selected date tasks">
+        <header><div><small>SCHEDULE</small><h3>{format(new Date(selected+'T12:00:00'), 'EEEE, d MMMM')}</h3></div><button className="primary" onClick={()=>onCreate(selected)}><Plus size={18}/> Add task</button></header>
+        {tasks.filter(t=>t.dueDate===selected).map(task=><button className="agenda-event" key={task.id} onClick={()=>onOpen(task)}><span className="agenda-time">All day</span><span><strong>{task.title}</strong><small>{task.project?.name} · {label(task.status)}</small></span></button>)}
+        {!tasks.some(t=>t.dueDate===selected)&&<Empty title="No tasks scheduled"><span>Choose another day or add a task.</span></Empty>}
+      </section>
     </Card>
   );
 }
@@ -1093,8 +1103,7 @@ export function SettingsView({
             >
               <label>
                 Current password
-                <input
-                  type="password"
+                <PasswordInput
                   name="currentPassword"
                   required
                   autoComplete="current-password"
@@ -1102,18 +1111,16 @@ export function SettingsView({
               </label>
               <label>
                 New password
-                <input
-                  type="password"
+                <PasswordInput
                   name="password"
-                  minLength={12}
+                  minLength={8}
                   required
                   autoComplete="new-password"
                 />
               </label>
               <label>
                 Confirm new password
-                <input
-                  type="password"
+                <PasswordInput
                   name="confirmPassword"
                   required
                   autoComplete="new-password"

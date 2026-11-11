@@ -4,7 +4,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { ArrowRight, CheckCircle2 } from "lucide-react";
-import { Logo, ErrorNotice } from "./ui";
+import { Logo, ErrorNotice, PasswordInput } from "./ui";
 import { send } from "@/lib/api";
 import { isNative, saveSession } from "@/lib/platform";
 const schema = z.object({
@@ -50,8 +50,8 @@ export function AuthScreen({ onLogin }: { onLogin: () => void }) {
           throw new Error(
             "Username: use 3–32 lowercase letters, numbers or underscores.",
           );
-        if (data.password.length < 12)
-          throw new Error("Use at least 12 characters.");
+        if (data.password.length < 8)
+          throw new Error("Use at least 8 characters.");
         if (data.password !== data.confirmPassword)
           throw new Error("Passwords do not match.");
         if (!data.acceptedTerms)
@@ -195,10 +195,9 @@ export function AuthScreen({ onLogin }: { onLogin: () => void }) {
                 <>
                   <label>
                     Password
-                    <input
+                    <PasswordInput
                       {...register("password")}
-                      type="password"
-                      minLength={mode === "login" ? 1 : 12}
+                      minLength={mode === "login" ? 1 : 8}
                       maxLength={128}
                       autoComplete={
                         mode === "login" ? "current-password" : "new-password"
@@ -206,7 +205,7 @@ export function AuthScreen({ onLogin }: { onLogin: () => void }) {
                       placeholder={
                         mode === "login"
                           ? "Enter your password"
-                          : "At least 12 characters"
+                          : "At least 8 characters"
                       }
                       required
                     />
@@ -214,9 +213,9 @@ export function AuthScreen({ onLogin }: { onLogin: () => void }) {
                   {mode !== "login" && (
                     <label>
                       Confirm password
-                      <input
+                      <PasswordInput
                         {...register("confirmPassword")}
-                        type="password"
+                        minLength={8}
                         autoComplete="new-password"
                         required
                       />
