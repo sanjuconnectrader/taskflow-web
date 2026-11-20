@@ -2497,3 +2497,12 @@ hr {
     scroll-behavior: auto !important;
   }
 }
+
+.employee-select { min-width:0; padding:0; border:0; margin:16px 0; }
+.employee-select summary { cursor:pointer; padding:10px 12px; border:1px solid var(--border, #dce1e9); border-radius:8px; }
+.employee-select details[open] { border:1px solid var(--border, #dce1e9); border-radius:8px; padding:8px; }
+.employee-options { max-height:240px; overflow:auto; }
+.employee-options .check-label { padding:8px; margin:0; overflow-wrap:anywhere; align-items:center; }
+.employee-options small { display:block; }
+.update-progress { max-width:100%; overflow-wrap:anywhere; }
+.update-progress .inline { flex-wrap:wrap; }

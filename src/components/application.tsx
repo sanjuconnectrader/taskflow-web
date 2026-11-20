@@ -448,7 +448,7 @@ function WorkspaceApp({
   );
   return (
     <div className={`app-shell ${ui.collapsed ? "sidebar-collapsed" : ""}`}>
-      <AppUpdates showStatus={tab==='settings'} />
+      <AppUpdates showStatus={tab==='settings' || tab==='notifications'} />
       <div
         className={`drawer-scrim ${drawer ? "visible" : ""}`}
         onClick={() => setDrawer(false)}

@@ -3,57 +3,70 @@ import {useEffect, useState} from 'react';
 import {Capacitor} from '@capacitor/core';
 import {API, request, send} from '@/lib/api';
 import {Modal, ErrorNotice} from './ui';
+import {newer} from '@/lib/versions';
 
-function newer(candidate:string, current:string) {
-  if(!/^\d+\.\d+\.\d+$/.test(candidate) || !/^\d+\.\d+\.\d+$/.test(current)) return false;
-  const a=candidate.split('.').map(Number), b=current.split('.').map(Number);
-  for(let i=0;i<3;i++) if(a[i]!==b[i]) return a[i]>b[i];
-  return false;
-}
+type Release={version:string;notes?:string;publishedAt?:string};
 export function AppUpdates({showStatus=false}:{showStatus?:boolean}){
-  const [installedVersion,setInstalledVersion]=useState('');
-  const [checkState,setCheckState]=useState<'checking'|'current'|'available'|'failed'>('checking');
-  const [latestVersion,setLatestVersion]=useState('');
+  const [installed,setInstalled]=useState('');
+  const [release,setRelease]=useState<Release>();
+  const [state,setState]=useState<'checking'|'current'|'available'|'failed'>('checking');
   const [checkNumber,setCheckNumber]=useState(0);
-  const [version,setVersion]=useState<string|null>(null);
+  const [popup,setPopup]=useState(false);
   const [progress,setProgress]=useState<{state:string;percent?:number}|null>(null);
   const [error,setError]=useState<unknown>();
   const [busy,setBusy]=useState(false);
+  const android=Capacitor.getPlatform()==='android';
+  const desktop=typeof window!=='undefined' && !!window.taskflow;
+  const web=!android && !desktop;
   useEffect(()=>{
-    const unsubscribe=window.taskflow?.onUpdateStatus?.(setProgress);
     let active=true;
+    const unsubscribe=window.taskflow?.onUpdateStatus?.(setProgress);
     async function check(){
-      const android=Capacitor.getPlatform()==='android';
-      if(!android && !window.taskflow?.getVersion) return;
       try {
-        if(active)setCheckState('checking');
-        const installed=android ? (await (await import('@capacitor/app')).App.getInfo()).version : await window.taskflow!.getVersion!();
-        if(active)setInstalledVersion(installed);
-        const release=await request<{version:string}>(android?'/updates/mobile':'/updates/desktop');
+        const version=android ? (await (await import('@capacitor/app')).App.getInfo()).version : desktop ? await window.taskflow!.getVersion!() : process.env.NEXT_PUBLIC_APP_VERSION || '1.1.0';
+        const latest:Release=web ? await fetch(`/version.json?t=${Date.now()}`,{cache:'no-store'}).then(r=>{if(!r.ok)throw Error('Unable to check for updates.');return r.json();}) : await request<Release>(android?'/updates/mobile':'/updates/desktop');
         if(!active)return;
-        setLatestVersion(release.version);
-        const available=newer(release.version,installed);
-        setCheckState(available?'available':'current');
-        if(android && available && sessionStorage.getItem('dismissed-update')!==release.version)setVersion(release.version);
-      } catch {if(active)setCheckState('failed');}
+        setInstalled(version);setRelease(latest);
+        const available=newer(latest.version,version);
+        setState(available?'available':'current');
+        if(!desktop && available && sessionStorage.getItem('dismissed-update')!==latest.version)setPopup(true);
+        if(!available)setPopup(false);
+      } catch(e){if(active){setState('failed');setError(e);}}
     }
-    check();const timer=setInterval(check,6*60*60*1000);
-    return ()=>{active=false;clearInterval(timer);unsubscribe?.();};
-  },[checkNumber]);
+    check();const timer=setInterval(check,15*60*1000);
+    const visible=()=>{if(document.visibilityState==='visible')check();};
+    document.addEventListener('visibilitychange',visible);
+    window.addEventListener('online',check);
+    let removeResume:(()=>void)|undefined;
+    if(android) import('@capacitor/app').then(async({App})=>{const listener=await App.addListener('appStateChange',({isActive})=>{if(isActive)check();});if(!active)listener.remove();else removeResume=()=>{listener.remove();};});
+    return ()=>{active=false;clearInterval(timer);unsubscribe?.();removeResume?.();document.removeEventListener('visibilitychange',visible);window.removeEventListener('online',check);};
+  },[checkNumber,android,desktop,web]);
+  const dismiss=()=>{if(release)sessionStorage.setItem('dismissed-update',release.version);setPopup(false);};
+  async function install(){
+    setBusy(true);setError(null);
+    try {
+      if(web){location.reload();return;}
+      if(desktop){await window.taskflow!.installUpdate!();return;}
+      const ticket=await send('/updates/mobile/ticket',{});
+      const {Browser}=await import('@capacitor/browser');
+      await Browser.open({url:`${API}${ticket.path}`});setPopup(false);
+    }catch(e){setError(e);}finally{setBusy(false);}
+  }
+  const action=<button type="button" className="primary" disabled={busy || state!=='available' || progress?.state==='downloading'} onClick={install}>{state==='current'?'Already Installed':busy?'Preparing update...':progress?.state==='ready'?'Install and Restart':web?'Refresh Application':'Install Update'}</button>;
   return <>
-    {showStatus && installedVersion && <div className="update-progress" role="status" aria-live="polite"><strong>{checkState==='current'?'Latest version installed':checkState==='available'?'New update available':checkState==='checking'?'Checking for updates…':'Unable to check for updates'}</strong><p>Installed: {installedVersion}{latestVersion && checkState==='available'?` · Latest: ${latestVersion}`:''}</p><button type="button" disabled={checkState==='checking'} onClick={()=>{sessionStorage.removeItem('dismissed-update');setCheckNumber(n=>n+1);}}>Check for updates</button></div>}
+    {showStatus && <section className="update-progress" aria-label="Application update notification" role="status" aria-live="polite">
+      <strong>{state==='available'?`TaskFlow ${release?.version} available`:state==='current'?'Already Installed':state==='checking'?'Checking for updates...':'Unable to check for updates'}</strong>
+      <p>{installed && `Installed: ${installed}`}{release && ` ? Latest: ${release.version}`}</p>
+      {release?.notes && <p style={{whiteSpace:'pre-wrap'}}>{release.notes}</p>}
+      {android && state==='available' && <p>Download the APK, open it from Downloads, and approve installation. Your account stays intact.</p>}
+      <div className="inline">{release && action}<button type="button" disabled={busy} onClick={()=>{setError(null);setState('checking');setCheckNumber(n=>n+1);}}>Check for updates</button></div>
+      <ErrorNotice error={error}/>
+    </section>}
     {progress?.state==='downloading' && <div className="update-progress" role="status">Downloading update: {progress.percent ?? 0}%</div>}
-    {progress?.state==='error' && <div className="update-progress" role="status">Update download failed. Please try again later.</div>}
-    <Modal open={!!version} title="New Update Available" onClose={()=>{if(version)sessionStorage.setItem('dismissed-update',version);setVersion(null);}}>
-      <div className="padded-form"><p>A new version of TaskFlow is available with improvements, new features, and bug fixes.</p>
-        <p className="muted">Android will ask you to approve installation.</p><ErrorNotice error={error}/>
-        <div className="inline"><button className="primary" disabled={busy} onClick={async()=>{setBusy(true);setError(null);try{
-          const ticket=await send('/updates/mobile/ticket',{});
-          const {Browser}=await import('@capacitor/browser');
-          await Browser.open({url:`${API}${ticket.path}`});setVersion(null);
-        }catch(e){setError(e);}finally{setBusy(false);}}}>Update Now</button>
-        <button onClick={()=>{if(version)sessionStorage.setItem('dismissed-update',version);setVersion(null);}}>Later</button></div>
-      </div>
+    {progress?.state==='ready' && !showStatus && <div className="update-progress" role="status">Update ready. Open Notifications to install and restart.</div>}
+    {progress?.state==='error' && <div className="update-progress" role="alert">Update failed. Open Notifications to retry.</div>}
+    <Modal open={popup} title="New Update Available" onClose={dismiss}>
+      <div className="padded-form"><p>TaskFlow {release?.version} is available.</p><p>{release?.notes || 'Improvements, new features, and bug fixes.'}</p><p className="muted">You can always return to Notifications to update.</p><ErrorNotice error={error}/><div className="inline">{action}<button type="button" onClick={dismiss}>Later</button></div></div>
     </Modal>
   </>;
 }

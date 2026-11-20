@@ -24,9 +24,21 @@ test("register, create a project and task, persist completion, and navigate", as
   await expect(
     page.getByRole("heading", { name: "Dashboard", exact: true }),
   ).toBeVisible();
+  await page.goto('/#team');
+  await page.getByLabel('Full name',{exact:true}).fill('Assigned Employee');
+  await page.getByLabel('Username',{exact:true}).fill(`employee_${suffix}`);
+  await page.locator('form').filter({has:page.getByRole('button',{name:'Create employee',exact:true})}).getByLabel('Email',{exact:true}).fill(`employee_${suffix}@taskflow.test`);
+  await page.getByLabel('Temporary password',{exact:true}).fill('Temporary password 123!');
+  await page.getByRole('button',{name:'Create employee',exact:true}).click();
+  await expect(page.getByText('One-time temporary password')).toBeVisible();
+  await expect(page.locator('pre')).toContainText(`employee_${suffix}`);
+  await page.getByRole('button',{name:'Done',exact:true}).click();
   await page.goto("/#projects");
   await page.getByRole("button", { name: "New project" }).click();
   await page.getByLabel("Project name").fill("Launch project");
+  await page.getByText('Select employees',{exact:true}).click();
+  await page.getByRole('searchbox').fill(`employee_${suffix}`);
+  await page.getByRole('checkbox',{name:/Assigned Employee/}).check();
   await page.getByRole("button", { name: "Save project" }).click();
   await expect(
     page.getByRole("button", { name: "Launch project", exact: true }),
@@ -34,6 +46,8 @@ test("register, create a project and task, persist completion, and navigate", as
   await page.goto("/#tasks");
   await page.getByRole("button", { name: "New task", exact: true }).click();
   await page.getByLabel("Task title").fill("Verify release");
+  await page.getByText('Select employees',{exact:true}).click();
+  await page.getByRole('checkbox',{name:/Assigned Employee/}).check();
   await page
     .getByRole("button", { name: "Create task", exact: true })
     .last()
@@ -63,4 +77,23 @@ test("register, create a project and task, persist completion, and navigate", as
       () => document.documentElement.scrollWidth <= innerWidth,
     ),
   ).toBeTruthy();
+  const employeeContext=await page.context().browser()!.newContext({viewport:page.viewportSize()!});
+  const employee=await employeeContext.newPage();
+  try {
+    await employee.goto('/');
+    await employee.getByLabel('Username or email').fill(`employee_${suffix}`);
+    await employee.getByLabel('Password',{exact:true}).fill('Temporary password 123!');
+    await employee.getByRole('button',{name:'Sign in',exact:true}).click();
+    await expect(employee.getByRole('heading',{name:'Set Your New Password'})).toBeVisible();
+    await employee.getByLabel('Current temporary password',{exact:true}).fill('Temporary password 123!');
+    await employee.getByLabel('New password',{exact:true}).fill('New employee password 123!');
+    await employee.getByLabel('Confirm new password',{exact:true}).fill('New employee password 123!');
+    await employee.getByRole('button',{name:'Set Password',exact:true}).click();
+    await expect(employee.getByRole('heading',{name:'Dashboard',exact:true})).toBeVisible();
+    await employee.goto('/#tasks');
+    await expect(employee.getByRole('button',{name:/Verify release/})).toBeVisible();
+    await employee.goto('/#notifications');
+    await expect(employee.getByRole('button',{name:'Already Installed'})).toBeDisabled();
+    expect(await employee.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBeTruthy();
+  } finally {await employeeContext.close();}
 });

@@ -1,4 +1,5 @@
 "use client";
+import {EmployeeSelect} from "./employee-select";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {usePagedQuery} from '@/lib/paged-query';
@@ -260,11 +261,7 @@ export function ProjectsView({
                 rows={3}
               />
             </label>
-            <label>Assigned employees
-              <select name="memberIds" multiple defaultValue={editor?.members?.map(m=>m.userId) || []}>
-                {members.map(m=><option key={m.userId} value={m.userId}>{m.user.displayName}{m.designation ? ` — ${m.designation}` : ''}{m.department ? ` · ${m.department}` : ''}</option>)}
-              </select><small className="muted">Use Ctrl/Cmd to select multiple people. Task assignees must be project members.</small>
-            </label>
+            <EmployeeSelect name="memberIds" label="Assigned employees" members={members} defaultValue={editor?.members?.map(m=>m.userId) || []}/>
             <div className="two-col">
               <label>
                 Color
@@ -569,13 +566,14 @@ export function TeamView({
             </article>
           ))}
       </div>
-      {admin && temporaryPassword && <div className="padded-form" role="alert"><h3>One-time temporary password</h3><p>Share this privately with the employee. It cannot be viewed again.</p><code>{temporaryPassword}</code><div className="inline"><button type="button" onClick={() => navigator.clipboard.writeText(temporaryPassword)}>Copy</button><button type="button" onClick={() => setTemporaryPassword(null)}>Done</button></div></div>}
+      {admin && temporaryPassword && <div className="padded-form" role="alert"><h3>One-time temporary password</h3><p>Share this privately with the employee. It cannot be viewed again.</p><pre style={{whiteSpace:"pre-wrap",overflowWrap:"anywhere"}}>{temporaryPassword}</pre><div className="inline"><button type="button" onClick={() => navigator.clipboard.writeText(temporaryPassword)}>Copy</button><button type="button" onClick={() => setTemporaryPassword(null)}>Done</button></div></div>}
       {admin && <form className="invite-form" onSubmit={async e => {
         e.preventDefault(); const form=e.currentTarget; const values=Object.fromEntries(new FormData(form));
-        try {const result=await send(`/workspaces/${wid}/employees`, values); setTemporaryPassword(result.temporaryPassword); form.reset(); refresh();} catch(err) {setError(err);}
+        try {const result=await send(`/workspaces/${wid}/employees`, values); setTemporaryPassword(`Name: ${result.member.user.displayName}\nUsername: ${result.member.user.username}\nEmail: ${result.member.user.email}\nTemporary password: ${result.temporaryPassword}`); form.reset(); refresh();} catch(err) {setError(err);}
       }}>
         <h3>Create employee</h3><p className="muted">A temporary password will be shown once after creation.</p>
         <div className="inline"><label>Full name<input name="fullName" required maxLength={100}/></label><label>Email<input name="email" type="email" required/></label></div>
+        <div className="inline"><label>Username<input name="username" required minLength={3} maxLength={32} pattern="[a-z0-9_]{3,32}" autoComplete="off"/></label><label>Temporary password<input name="temporaryPassword" type="password" required minLength={8} maxLength={128} autoComplete="new-password"/></label></div>
         <div className="inline"><label>Designation<input name="designation" list="designation-options" maxLength={100}/><datalist id="designation-options">{['Project Manager','Team Lead','Frontend Developer','Backend Developer','Full Stack Developer','UI/UX Designer','QA Engineer','DevOps Engineer','Business Analyst','Marketing Executive'].map(value=><option value={value} key={value}/>)}</datalist></label><label>Department<input name="department" maxLength={100}/></label></div>
         <div className="inline"><label>Phone (optional)<input name="phone" type="tel"/></label><label>Employment status<select name="employmentStatus"><option value="ACTIVE">Active</option><option value="INACTIVE">Inactive</option></select></label></div>
         <label>Company role<select name="role"><option value="EMPLOYEE">Employee</option><option value="PROJECT_MANAGER">Project Manager</option><option value="TEAM_LEAD">Team Lead</option></select></label>

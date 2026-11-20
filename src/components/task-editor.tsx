@@ -1,4 +1,5 @@
 "use client";
+import {EmployeeSelect} from "./employee-select";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {usePagedQuery} from '@/lib/paged-query';
@@ -303,28 +304,7 @@ export function TaskEditor({
                   onChange={(e) => setDue(e.target.value)}
                 />
               </label>
-              <label>
-                Assignees
-                <select
-                  multiple
-                  disabled={restricted}
-                  value={assigneeIds}
-                  onChange={(e) =>
-                    setAssignees(
-                      [...e.target.selectedOptions].map((o) => o.value),
-                    )
-                  }
-                >
-                  {members.filter(m=>{const project=projects.find(p=>p.id===projectId);return !project?.restrictMembership || project.members?.some(member=>member.userId===m.userId);}).map((m) => (
-                    <option value={m.userId} key={m.userId}>
-                      {m.user.displayName}
-                    </option>
-                  ))}
-                </select>
-                <small className="muted">
-                  Use Ctrl/Cmd to select multiple people.
-                </small>
-              </label>
+              <EmployeeSelect label="Assignees" disabled={restricted} members={members.filter(m=>{const project=projects.find(p=>p.id===projectId);return !project?.restrictMembership || project.members?.some(member=>member.userId===m.userId);})} value={assigneeIds} onChange={setAssignees}/>
               <label>
                 Labels
                 <input

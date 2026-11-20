@@ -8,7 +8,7 @@ import { Logo, ErrorNotice, PasswordInput } from "./ui";
 import { send } from "@/lib/api";
 import { isNative, saveSession } from "@/lib/platform";
 const schema = z.object({
-  email: z.email("Enter a valid email address."),
+  email: z.string().trim().min(3, "Enter your username or email address."),
   password: z.string(),
   username: z.string().optional(),
   confirmPassword: z.string().optional(),
@@ -174,10 +174,10 @@ export function AuthScreen({ onLogin }: { onLogin: () => void }) {
                 </>
               )}
               <label>
-                Email address
+                {mode === "login" ? "Username or email" : "Email address"}
                 <input
                   {...register("email")}
-                  type="email"
+                  type={mode === "login" ? "text" : "email"}
                   autoComplete="email"
                   placeholder="you@company.com"
                   required
